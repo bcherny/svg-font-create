@@ -32,7 +32,7 @@ require('./node_modules/svg-font-create/svg-font-create')({
 
 ----------------------------
 
-This tool creates SVG font from separate images. Due simplified process,
+This tool creates an SVG font from separate images. Due simplified process,
 images must be preliminary optimized with [SVGO](https://github.com/svg/svgo):
 
 - scaled to required height
@@ -40,17 +40,7 @@ images must be preliminary optimized with [SVGO](https://github.com/svg/svgo):
 - no `fill` commands colors transforms and others
 - `fill` defined by polyline direction (`cw` - black, `ccw` - white)
 
-Installation:
+### License
 
-```
-npm install svg-font-create
-```
-
-Usage example:
-
-See Makefile in embedded fonts repos https://github.com/fontello/awesome-uni.font/blob/master/Makefile
-
-License
--------
 View the [LICENSE](https://github.com/fontello/svg-font-create/blob/master/LICENSE) file
 (MIT).
