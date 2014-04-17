@@ -2,52 +2,68 @@
 
 'use strict';
 
+// imports
 var fs        = require('fs');
 var path      = require('path');
 var _         = require('lodash');
-var yaml      = require('js-yaml');
 var DOMParser = require('xmldom').DOMParser;
 var fstools   = require('fs-tools');
 var execFile  = require('child_process').execFile;
-var ArgumentParser = require('argparse').ArgumentParser;
+var glob      = require('glob');
+var execSync  = require('exec-sync');
 
+// exports
+module.exports = convert;
+
+// config
+var DEFAULT_CONFIG = {
+  ascent: 850,
+  descent: 150,
+  weight: 'Normal'
+};
+var config = require(path.resolve('./package.json'));
 
 function parseSvgImage(data, filename) {
 
-  var doc = (new DOMParser()).parseFromString(data, "application/xml");
-  var svg = doc.getElementsByTagName('svg')[0];
+  var doc = new DOMParser().parseFromString(data, 'application/xml'),
+      svg = doc.getElementsByTagName('svg')[0];
 
   if (!svg.hasAttribute('height')) {
-    throw filename ? 'Missed height attribute in ' + filename : 'Missed height attribute';
+    throw new Error('Missed height attribute ' + (filename ? ' in ' + filename : ''));
   }
   if (!svg.hasAttribute('width')) {
-    throw filename ? 'Missed width attribute in ' + filename : 'Missed width attribute';
+    throw new Error('Missed width attribute ' + (filename ? ' in ' + filename : ''));
   }
 
-  var height = svg.getAttribute('height');
-  var width  = svg.getAttribute('width');
+      // Silly strip 'px' at the end, if exists
+  var height = parseFloat(svg.getAttribute('height')),
+      width = parseFloat(svg.getAttribute('width')),
 
-  // Silly strip 'px' at the end, if exists
-  height = parseFloat(height);
-  width  = parseFloat(width);
+      // get elements
+      path = svg.getElementsByTagName('path'),
+      polygon = svg.getElementsByTagName('polygon'),
 
-  var path = svg.getElementsByTagName('path');
+      // element data
+      transform = '',
+      d = '';
 
-  if (path.length > 1) {
-    throw 'Multiple paths not supported' + (filename ? ' (' + filename + ' ' : '');
+  if (!path.length && !polygon.length) {
+    throw new Error('No path or polygon data found' + (filename ? ' (' + filename + ')' : ''));
   }
-  if (path.length === 0) {
-    throw 'No path data fount' + (filename ? ' (' + filename + ' ' : '');
+
+  if (path.length) {
+
+    d = compoundPathFromPaths(path);
+
+  } else if (polygon.length) {
+
+    d = pathDataFromPolygonPoints(compoundPathFromPolygons(polygon));
+    path = polygon;
+
   }
 
-  path = path[0];
-
-  var d = path.getAttribute('d');
-
-  var transform = '';
-
-  if (path.hasAttribute('transform')) {
-    transform = path.getAttribute('transform');
+  if (path[0].hasAttribute('transform')) {
+    transform = path[0].getAttribute('transform');
   }
 
   return {
@@ -59,167 +75,164 @@ function parseSvgImage(data, filename) {
 }
 
 
-var svgImageTemplate = _.template(
-    '<svg height="<%= height %>" width="<%= width %>" xmlns="http://www.w3.org/2000/svg">' +
-    '<path d="<%= d %>"<% if (transform) { %> transform="<%= transform %>"<% } %>/>' +
-    '</svg>'
-  );
-
-var svgFontTemplate = _.template(
-    '<?xml version="1.0" standalone="no"?>\n' +
-    '<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">\n' +
-    '<svg xmlns="http://www.w3.org/2000/svg">\n' +
-    '<metadata><%= metadata %></metadata>\n' +
-    '<defs>\n' +
-    '<font id="<%= font.fontname %>" horiz-adv-x="<%= fontHeight %>" >\n' +
-
-    '<font-face' +
-      ' font-family="<%= fontFamily %>"' +
-      ' font-weight="400"' +
-      ' font-stretch="normal"' +
-      ' units-per-em="<%= fontHeight %>"' +
-      //panose-1="2 0 5 3 0 0 0 0 0 0"
-      ' ascent="<%= font.ascent %>"' +
-      ' descent="<%= font.descent %>"' +
-      //bbox="-1.33333 -150.333 1296 850"
-      //underline-thickness="50"
-      //underline-position="-100"
-      //unicode-range="U+002B-1F6AB"
-    ' />\n' +
-
-    '<missing-glyph horiz-adv-x="<%= fontHeight %>" />\n' +
-
-    '<% _.forEach(glyphs, function(glyph) { %>' +
-      '<glyph' +
-        ' glyph-name="<%= glyph.css %>"' +
-        ' unicode="<%= glyph.unicode %>"' +
-        ' d="<%= glyph.d %>"' +
-        ' horiz-adv-x="<%= glyph.width %>"' +
-      ' />\n' +
-    '<% }); %>' +
-
-    '</font>\n' +
-    '</defs>\n' +
-    '</svg>'
-  );
-
-
-var parser = new ArgumentParser({
-  version: require('./package.json').version,
-  addHelp: true,
-  description: 'Create SVG font from separate images'
-});
-parser.addArgument([ '-c', '--config' ], { help: 'Font config file', required: true });
-parser.addArgument([ '-i', '--input_dir' ], { help: 'Source images path', required: true });
-parser.addArgument([ '-o', '--output' ], { help: 'Output font file path', required: true });
-parser.addArgument([ '-s', '--svgo_config' ], { help: 'SVGO config path (use default if not set)' });
-
-var args = parser.parseArgs();
+var svgImageTemplate = loadTemplate('./templates/image.svg'),
+    svgFontTemplate = loadTemplate('./templates/font.svg'),
+    cssTemplate = loadTemplate('./templates/font.css'),
+    htmlTemplate = loadTemplate('./templates/font.html');
 
 ////////////////////////////////////////////////////////////////////////////////
 
+function convert (args) {
 
-var config, tmpDir;
+  var tmpDir = fstools.tmpdir();
+  fstools.mkdirSync(tmpDir);
 
-try {
-  config = yaml.load(fs.readFileSync(args.config, 'utf8'));
-} catch (e) {
-  console.error('Can\'t read config file ' + args.config);
-  process.exit(1);
+  var font = config.font || DEFAULT_CONFIG;
+  // fix descent sign
+  if (font.descent > 0) { font.descent = -font.descent; }
+
+  var fontHeight = font.ascent - font.descent;
+
+  console.log('Transforming coordinates');
+
+  //
+  // Recalculate coordinates from image to font
+  //
+  fstools.walkSync(args.input_dir, /[.]svg$/i, function (file) {
+    var transform = '', scale, svgOut;
+    var glyph = parseSvgImage(fs.readFileSync(file, 'utf8'), file);
+
+    scale = fontHeight / glyph.height;
+
+    // descent shift
+    transform += 'translate(0 ' + font.descent + ')';
+
+    // scale
+    transform += ' scale(' + scale + ')';
+
+    // vertical mirror
+    transform += ' scale(1, -1)';
+
+    svgOut = svgImageTemplate({
+      height : glyph.height,
+      width  : glyph.width,
+      d      : glyph.d,
+      transform : glyph.transform ? transform + ' ' + glyph.transform : transform
+    });
+
+    fs.writeFileSync(path.join(tmpDir, path.basename(file)), svgOut, 'utf8');
+  });
+
+  console.log('Optimizing images');
+
+  var svgoConfig = args.svgo_config ? path.resolve(args.svgo_config) : path.resolve(__dirname, 'svgo.yml');
+
+  execFile(
+    path.resolve(__dirname, './node_modules/.bin/svgo'),
+    [ '-f', tmpDir, '--config', svgoConfig ],
+    function (err) {
+
+    if (err) {
+      console.error(err);
+      process.exit(1);
+    }
+
+    console.log('Creating font file');
+
+    var rgxUnicode = /([a-f][a-f\d]{3,4})/i,
+        rgxName = /-(.+).svg/,
+        glyphs = [];
+
+    glob.sync('./src/*.svg').forEach(function (file) {
+
+      var unicode = file.match(rgxUnicode),
+          name = file.match(rgxName);
+
+      if (!unicode[0]) {
+        throw new Error ('Expected "' + file + '" to be in the format "xxxx-icon-name.svg"');
+      }
+
+      var svg = parseSvgImage(fs.readFileSync(path.resolve(tmpDir, path.basename(file)), 'utf8'), file);
+
+      glyphs.push({
+        css: path.basename(name[0] || unicode[0], '.svg').replace(/-/g, ' ').trim(),
+        unicode: '&#x' + unicode[0] + ';',
+        width: svg.width,
+        d: svg.d
+      });
+
+    });
+
+    var opts = {
+      font : font,
+      glyphs : glyphs,
+      metadata : 'Copyright (c) ' + new Date().getFullYear() + ' Turn Inc.',
+      fontHeight : font.ascent - font.descent,
+      fontFamily : config.name,
+      hex: hex()
+    };
+
+    var svgOut = svgFontTemplate(opts),
+        svg = args.output_dir + '/' + args.name + '.svg',
+        ttf = args.output_dir + '/' + args.name + '.ttf',
+        woff = args.output_dir + '/' + args.name + '.woff',
+        eot = args.output_dir + '/' + args.name + '.eot';
+
+    fs.writeFileSync(svg, svgOut, 'utf8');
+    fs.writeFileSync('./dist/font.html', htmlTemplate(opts), 'utf8');
+    fs.writeFileSync('./dist/font.css', cssTemplate(opts), 'utf8');
+
+    fstools.removeSync(tmpDir);
+
+    console.log('Generating ttf');
+    execSync(path.resolve(__dirname, './node_modules/.bin/svg2ttf ' + svg + ' ' + ttf));
+
+    console.log('Generating woff');
+    execSync(path.resolve(__dirname, './node_modules/.bin/ttf2woff ' + ttf + ' ' + woff));
+
+    console.log('Generating eot');
+    execSync(path.resolve(__dirname, './node_modules/.bin/ttf2eot ' + ttf + ' ' + eot));
+
+  });
+
+};
+
+// helpers
+
+function loadTemplate (file) {
+  return _.template(fs.readFileSync(path.resolve(__dirname, file)).toString());
 }
 
-//tmpDir = path.resolve('./tmp');
-tmpDir = fstools.tmpdir();
-fstools.mkdirSync(tmpDir);
+/* generates a random hex code */
+function hex () {
+  return Math.floor(Math.random()*16777215).toString(16);
+}
 
-var font = config.font;
-// fix descent sign
-if (font.descent > 0) { font.descent = -font.descent; }
+function pathDataFromPolygonPoints (points) {
 
-var fontHeight = font.ascent - font.descent;
+  return points
+    .split(/\s+/)
+    .map(function (p, i) {
+      return (i && 'L' || 'M') + p;
+    })
+    .join('');
 
-console.log('Transforming coordinates');
+}
 
-//
-// Recalculate coordinates from image to font
-//
-fstools.walkSync(args.input_dir, /[.]svg$/i, function (file) {
-  var transform = '', scale, svgOut;
-  var glyph = parseSvgImage(fs.readFileSync(file, 'utf8'), file);
+function compoundPathFromPaths (paths) {
 
-  scale = fontHeight / glyph.height;
-  // descent shift
-  transform += 'translate(0 ' + font.descent + ')';
-  // scale
-  transform += ' scale(' + scale + ')';
-  // vertical mirror
-  transform += ' translate(0 ' + (fontHeight / 2) + ') scale(1 -1) translate(0 ' + (-fontHeight / 2) + ')';
+  return _.map(paths, function (path) {
+      return path.getAttribute('d');
+    })
+    .join(' ');
 
-  svgOut = svgImageTemplate({
-    height : glyph.height,
-    width  : glyph.width,
-    d      : glyph.d,
-    transform : glyph.transform ? transform + ' ' + glyph.transform : transform
-  });
+}
 
-  fs.writeFileSync(path.join(tmpDir, path.basename(file)), svgOut, 'utf8');
-});
+function compoundPathFromPolygons (points) {
 
-console.log('Optimizing images');
+  return 'M' + _.map(points, function (path) {
+      return path.getAttribute('points');
+    })
+    .join('z M') + 'z';
 
-var svgoConfig = args.svgo_config ? path.resolve(args.svgo_config) : path.resolve(__dirname, 'svgo.yml');
-
-execFile(
-  path.resolve(process.cwd(), './node_modules/.bin/svgo'),
-  [ '-f', tmpDir, '--config', svgoConfig ],
-  function (err) {
-
-  if (err) {
-    console.error(err);
-    process.exit(1);
-  }
-
-  console.log('Creating font file');
-
-  _.each(config.glyphs, function (glyph) {
-    var fileName = glyph.file || glyph.css + '.svg';
-    var svg = parseSvgImage(fs.readFileSync(path.resolve(tmpDir, fileName), 'utf8'), fileName);
-
-    glyph.width = svg.width;
-    glyph.d = svg.d;
-
-    // Fix for FontForge: need space between old and new polyline
-    glyph.d = glyph.d.replace(/zm/g, 'z m');
-
-    // Round all values to int
-    //glyph.d = glyph.d.replace(
-    //  /\d+\.\d+/g,
-    //  function (match) {
-    //    if (+match > 100) {
-    //      return Number(match).toFixed(0) + '';
-    //    }
-    //    return Number(match).toFixed(1) + '';
-    //  }
-    //);
-
-
-    // 'unicode' attribute can be number in hex format, or ligature
-    if (glyph.code === +glyph.code) {
-      glyph.unicode = '&#x' + glyph.code.toString(16) + ';';
-    } else {
-      glyph.unicode = glyph.code;
-    }
-  });
-
-  var svgOut = svgFontTemplate({
-    font : font,
-    glyphs : config.glyphs,
-    metadata : font.copyright || "Generated by fontello.com",
-    fontHeight : font.ascent - font.descent,
-    fontFamily : font.familyname || "myfont"
-  });
-
-  fs.writeFileSync(args.output, svgOut, 'utf8');
-
-  fstools.removeSync(tmpDir);
-});
+}

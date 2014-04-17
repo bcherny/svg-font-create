@@ -1,0 +1,23 @@
+<!doctype html>
+<html>
+<head>
+	<meta charset="utf-8" />
+	<link rel="stylesheet" href="./font.css" />
+	<style>
+		div {
+			height: 100px;
+			float: left;
+			font-size: 36px;
+			text-align: center;
+			width: 100px;
+		}
+	</style>
+</head>
+<body>
+
+	<% _.forEach(glyphs, function(glyph) { %>
+		<div class="tif-<%= glyph.css.replace(/ /g, '-') %>"></div>
+	<% }); %>
+
+</body>
+</html>
