@@ -1,4 +1,4 @@
-@mixin <%= fontFamily.replace(/ /g, '-') %> ($path = "") {
+@mixin <%= fontFamily.replace(/ /g, '-') %> ($path: "") {
 
 	@font-face {
 		font-family: "<%= fontFamily %>";
