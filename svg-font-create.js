@@ -110,7 +110,7 @@ function convert (args) {
     scale = fontHeight / glyph.height;
 
     // descent shift
-    transform += 'translate(0 ' + font.descent + ')';
+    //transform += 'translate(0 ' + font.descent + ')';
 
     // scale
     transform += ' scale(' + scale + ')';
