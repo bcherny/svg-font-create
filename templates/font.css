@@ -9,7 +9,7 @@
 	font-style: normal;
 }
 
-[class^="tif-"], [class*=" tif-"] {
+[class^="<%= prefix %>-"], [class*=" <%= prefix %>-"] {
 	font-family: "<%= fontFamily %>";
 	speak: none;
 	font-style: normal;
@@ -24,7 +24,7 @@
 }
 
 <% _.forEach(glyphs, function(glyph) { %>
-	.tif-<%= glyph.css.replace(/ /g, '-') %>:before {
+	.<%= prefix %>-<%= glyph.css.replace(/ /g, '-') %>:before {
 		content: "\<%= glyph.unicode.replace(/([^\w\d]+)/g, '').slice(1) %>";
 	}
 <% }); %>

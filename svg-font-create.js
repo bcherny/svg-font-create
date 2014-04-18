@@ -78,11 +78,16 @@ function parseSvgImage(data, filename) {
 var svgImageTemplate = loadTemplate('./templates/image.svg'),
     svgFontTemplate = loadTemplate('./templates/font.svg'),
     cssTemplate = loadTemplate('./templates/font.css'),
+    sassTemplate = loadTemplate('./templates/font.scss'),
     htmlTemplate = loadTemplate('./templates/font.html');
 
 ////////////////////////////////////////////////////////////////////////////////
 
 function convert (args) {
+
+  if (args.name) {
+    config.name = args.name;
+  }
 
   var tmpDir = fstools.tmpdir();
   fstools.mkdirSync(tmpDir);
@@ -137,13 +142,14 @@ function convert (args) {
       process.exit(1);
     }
 
-    console.log('Creating font file');
+    console.log('Generating glyphs');
 
     var rgxUnicode = /([a-f][a-f\d]{3,4})/i,
         rgxName = /-(.+).svg/,
+        rgxAcronym = /\b([\w\d])/ig,
         glyphs = [];
 
-    glob.sync('./src/*.svg').forEach(function (file) {
+    glob.sync(args.input_dir + '/*.svg').forEach(function (file) {
 
       var unicode = file.match(rgxUnicode),
           name = file.match(rgxName);
@@ -169,29 +175,40 @@ function convert (args) {
       metadata : 'Copyright (c) ' + new Date().getFullYear() + ' Turn Inc.',
       fontHeight : font.ascent - font.descent,
       fontFamily : config.name,
+      prefix: args.prefix || config.name.match(rgxAcronym).join(''),
       hex: hex()
     };
 
     var svgOut = svgFontTemplate(opts),
-        svg = args.output_dir + '/' + args.name + '.svg',
-        ttf = args.output_dir + '/' + args.name + '.ttf',
-        woff = args.output_dir + '/' + args.name + '.woff',
-        eot = args.output_dir + '/' + args.name + '.eot';
+        svg = args.output_dir + '/' + config.name + '.svg',
+        ttf = args.output_dir + '/' + config.name + '.ttf',
+        woff = args.output_dir + '/' + config.name + '.woff',
+        eot = args.output_dir + '/' + config.name + '.eot';
 
+    console.log('Generating SVG');
     fs.writeFileSync(svg, svgOut, 'utf8');
-    fs.writeFileSync('./dist/font.html', htmlTemplate(opts), 'utf8');
+
+    console.log('Generating TTF');
+    execSync(path.resolve(__dirname, './node_modules/.bin/svg2ttf ' + svg + ' ' + ttf));
+
+    console.log('Generating WOFF');
+    execSync(path.resolve(__dirname, './node_modules/.bin/ttf2woff ' + ttf + ' ' + woff));
+
+    console.log('Generating EOT');
+    execSync(path.resolve(__dirname, './node_modules/.bin/ttf2eot ' + ttf + ' ' + eot));
+
+    console.log('Generating CSS');
     fs.writeFileSync('./dist/font.css', cssTemplate(opts), 'utf8');
+
+    console.log('Generating SASS');
+    fs.writeFileSync('./dist/font.scss', sassTemplate(opts), 'utf8');
+
+    console.log('Generating HTML spec');
+    fs.writeFileSync('./dist/font.html', htmlTemplate(opts), 'utf8');
 
     fstools.removeSync(tmpDir);
 
-    console.log('Generating ttf');
-    execSync(path.resolve(__dirname, './node_modules/.bin/svg2ttf ' + svg + ' ' + ttf));
-
-    console.log('Generating woff');
-    execSync(path.resolve(__dirname, './node_modules/.bin/ttf2woff ' + ttf + ' ' + woff));
-
-    console.log('Generating eot');
-    execSync(path.resolve(__dirname, './node_modules/.bin/ttf2eot ' + ttf + ' ' + eot));
+    console.log('Done!');
 
   });
 

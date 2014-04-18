@@ -6,6 +6,10 @@ SVG font creator
 - Instead of relying on config.yml, we rely on package.json for metadata and the src directory for glyph names. This should be a more designer-friendly approach.
 - Automatically convert polygons to paths
 - Automatically convert multi-path SVGs to compound paths
+- Generate several font formats (SVG, TTF, WOFF, EOT)
+- Generate a font spec file (font.html)
+- Generate CSS and SASS files
+- Support prefixes for CSS classes, defaulting to the acronymized font name (eg. "my-font-2" would become "mf2-...")
 
 ### How do I use this?
 
@@ -24,21 +28,21 @@ svg-font-create can be summoned through the CLI, or with a node script:
 
 ```js
 require('./node_modules/svg-font-create/svg-font-create')({
-	name: 'myFont',
-	input_dir: './src',
-	output_dir: './dist'
+	prefix: 'mf',			// for CSS classes, eg. ".mf-favorite"
+	input_dir: './src',		// where your SVG source files are
+	output_dir: './dist'	// where you want the generated font to go
 });
 ```
 
-----------------------------
+### Options
 
-This tool creates an SVG font from separate images. Due simplified process,
-images must be preliminary optimized with [SVGO](https://github.com/svg/svgo):
-
-- scaled to required height
-- all paths joined to single one
-- no `fill` commands colors transforms and others
-- `fill` defined by polyline direction (`cw` - black, `ccw` - white)
+| cli flag			| programmatic usage					| description										|
+|-------------------|---------------------------------------|---------------------------------------------------|
+| `--name`			| `name: "foo"`							| Font name, defaults to name field in package.json	|
+| `--input-dir`		| `input_dir: "./src"`					| Source images path								|
+| `--output_dir`	| `output_dir: "./dist"`				| Output font file path								|
+| `--svgo_config`	| `svgo_config: "./path/to/svgo.yml"`	| SVGO config path (uses default if not set)		|
+| `--prefix`		| `prefix: "foo"`						| Prefix for CSS classes							|
 
 ### License
 
