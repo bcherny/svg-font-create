@@ -44,6 +44,13 @@ require('svg-font-create')({
 | `--output_dir`	| `output_dir: "./dist"`				| Output font file path								|
 | `--prefix`		| `prefix: "foo"`						| Prefix for CSS classes							|
 
+### Building
+
+```bash
+npm install
+coffee -bcw .
+```
+
 ### License
 
 View the [LICENSE](https://github.com/fontello/svg-font-create/blob/master/LICENSE) file
