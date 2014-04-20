@@ -10,6 +10,7 @@ SVG font creator
 - Generate a font spec file (font.html)
 - Generate CSS and SASS files
 - Support prefixes for CSS classes, defaulting to the acronymized font name (eg. "my-font-2" would become "mf2-...")
+- Remove support for SVGO, eliminate unnecessary filesystem i/o
 
 ### How do I use this?
 
@@ -41,7 +42,6 @@ require('svg-font-create')({
 | `--name`			| `name: "foo"`							| Font name, defaults to name field in package.json	|
 | `--input-dir`		| `input_dir: "./src"`					| Source images path								|
 | `--output_dir`	| `output_dir: "./dist"`				| Output font file path								|
-| `--svgo_config`	| `svgo_config: "./path/to/svgo.yml"`	| SVGO config path (uses default if not set)		|
 | `--prefix`		| `prefix: "foo"`						| Prefix for CSS classes							|
 
 ### License

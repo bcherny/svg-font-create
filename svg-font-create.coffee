@@ -29,8 +29,10 @@ parse = (data, filename) ->
 	width = parseFloat svg.getAttribute 'width'
 
 	# check for width and height
-	if isNaN height then throw new Error "Missing height attribute in #{filename}"
-	if isNaN width then throw new Error "Missing width attribute in #{filename}"
+	if isNaN height
+		throw new Error "Missing height attribute in #{filename}"
+	if isNaN width
+		throw new Error "Missing width attribute in #{filename}"
 
 	# get elements
 	paths = svg.getElementsByTagName 'path'
@@ -90,7 +92,8 @@ convert = (args) ->
 		unicode = _.first file.match rgxUnicode
 
 		# check for unicode
-		if not unicode? then throw new Error "Expected #{file} to be in the format 'xxxx-icon-name.svg'"
+		if not unicode?
+			throw new Error "Expected #{file} to be in the format 'xxxx-icon-name.svg'"
 		
 		# normalize glyph
 		glyph = parse (fs.readFileSync file, 'utf8'), file
