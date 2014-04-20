@@ -3,10 +3,9 @@ fs = require 'fs'
 path = require 'path'
 _ = require 'lodash'
 DOMParser = (require 'xmldom').DOMParser
-fstools = require 'fs-tools'
-execFile = (require 'child_process').execFile
 glob = require 'glob'
 execSync = require 'exec-sync'
+SvgPath = require 'svgpath'
 util = require './util'
 
 # config
@@ -69,9 +68,6 @@ convert = (args) ->
 	if args.name?
 		config.name = args.name
 
-	tmpDir = do fstools.tmpdir
-	fstools.mkdirSync tmpDir
-
 	font = config.font or DEFAULT_CONFIG
 	
 	# fix descent sign
@@ -79,81 +75,59 @@ convert = (args) ->
 		font.descent = -font.descent
 
 	fontHeight = font.ascent - font.descent
+	glyphs = []
 
-	console.log 'Transforming coordinates'
+	console.log 'Scaling images'
 
 	# Recalculate coordinates from image to font
-	fstools.walkSync args.input_dir, rgxFiles, (file) ->
-
+	(glob.sync "#{args.input_dir}/*.svg").forEach (file) ->
+		
 		glyph = parseSvgImage (fs.readFileSync file, 'utf8'), file
 		scale = fontHeight / glyph.height
-		transform = "scale(#{scale}) scale(1, -1)"
 
-		svgOut = svgImageTemplate
-			height: glyph.height
+		glyph.d = do new SvgPath glyph.d
+		.scale scale
+		.scale 1, -1
+		.toString
+		
+		unicode = file.match rgxUnicode
+		name = file.match rgxName
+
+		if not unicode[0]?
+			throw new Error "Expected #{file} to be in the format 'xxxx-icon-name.svg'"
+
+		glyphs.push
+			css: do ((path.basename name[0] or unicode[0], '.svg').replace /-/g, ' ').trim
+			unicode: "&#x#{unicode[0]};"
 			width: glyph.width
 			d: glyph.d
-			transform: transform + (if glyph.transform? then " #{glyph.transform}" else transform)
 
-		fs.writeFileSync (path.join tmpDir, path.basename file), svgOut, 'utf8'
+	opts =
+		font: font
+		glyphs: glyphs
+		metadata: "Copyright (c) #{do (new Date).getFullYear} Turn Inc."
+		fontHeight: font.ascent - font.descent
+		fontFamily: config.name
+		prefix: args.prefix or (config.name.match rgxAcronym).join ''
+		hex: do util.hex
 
-	console.log 'Optimizing images'
+	svg = "#{args.output_dir }/#{config.name}.svg"
+	ttf = "#{args.output_dir}/#{config.name}.ttf"
+	woff = "#{args.output_dir}/#{config.name}.woff"
+	eot = "#{args.output_dir}/#{config.name}.eot"
 
-	svgoConfig = if args.svgo_config? then path.resolve args.svgo_config else path.resolve __dirname, 'svgo.yml'
-
-	execFile path.resolve(__dirname, './node_modules/.bin/svgo'), [ '-f', tmpDir, '--config', svgoConfig ], (err) ->
-
-		if err
-			console.error(err);
-			process.exit(1);
-
-		console.log 'Generating glyphs'
-
-		glyphs = [];
-
-		(glob.sync "#{args.input_dir}/*.svg").forEach (file) ->
-
-			unicode = file.match rgxUnicode
-			name = file.match rgxName
-
-			if not unicode[0]?
-				throw new Error "Expected #{file} to be in the format 'xxxx-icon-name.svg'"
-
-			svg = parseSvgImage fs.readFileSync(path.resolve(tmpDir, path.basename(file)), 'utf8'), file
-
-			glyphs.push
-				css: do ((path.basename name[0] or unicode[0], '.svg').replace /-/g, ' ').trim
-				unicode: "&#x#{unicode[0]};"
-				width: svg.width
-				d: svg.d
-
-		opts =
-			font: font
-			glyphs: glyphs
-			metadata: "Copyright (c) #{do (new Date).getFullYear} Turn Inc."
-			fontHeight: font.ascent - font.descent
-			fontFamily: config.name
-			prefix: args.prefix or (config.name.match rgxAcronym).join ''
-			hex: do util.hex
-
-		svg = "#{args.output_dir }/#{config.name}.svg"
-		ttf = "#{args.output_dir}/#{config.name}.ttf"
-		woff = "#{args.output_dir}/#{config.name}.woff"
-		eot = "#{args.output_dir}/#{config.name}.eot"
-
-		_.forEach
-			'Generating SVG': -> fs.writeFileSync svg, (svgFontTemplate opts), 'utf8'
-			'Generating TTF': -> execSync path.resolve __dirname, "./node_modules/.bin/svg2ttf #{svg} #{ttf}"
-			'Generating WOFF': -> execSync path.resolve __dirname, "./node_modules/.bin/ttf2woff #{ttf} #{woff}"
-			'Generating EOT': -> execSync path.resolve __dirname, "./node_modules/.bin/ttf2eot #{ttf} #{eot}"
-			'Generating CSS': -> fs.writeFileSync './dist/font.css', (cssTemplate opts), 'utf8'
-			'Generating SASS': -> fs.writeFileSync './dist/font.scss', (sassTemplate opts), 'utf8'
-			'Generating HTML spec': -> fs.writeFileSync './dist/font.html', (htmlTemplate opts), 'utf8'
-			'Cleaning up temporary files': -> fstools.removeSync tmpDir
-			'Done!': ->
-		, (fn, message) ->
-			console.log message
-			do fn
+	_.forEach
+		'Generating SVG': -> fs.writeFileSync svg, (svgFontTemplate opts), 'utf8'
+		'Generating TTF': -> execSync path.resolve __dirname, "./node_modules/.bin/svg2ttf #{svg} #{ttf}"
+		'Generating WOFF': -> execSync path.resolve __dirname, "./node_modules/.bin/ttf2woff #{ttf} #{woff}"
+		'Generating EOT': -> execSync path.resolve __dirname, "./node_modules/.bin/ttf2eot #{ttf} #{eot}"
+		'Generating CSS': -> fs.writeFileSync './dist/font.css', (cssTemplate opts), 'utf8'
+		'Generating SASS': -> fs.writeFileSync './dist/font.scss', (sassTemplate opts), 'utf8'
+		'Generating HTML spec': -> fs.writeFileSync './dist/font.html', (htmlTemplate opts), 'utf8'
+		'Done!': ->
+	, (fn, message) ->
+		console.log message
+		do fn
 
 # exports
 module.exports = convert
