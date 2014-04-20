@@ -16,9 +16,6 @@ parser.addArgument [ '-i', '--input_dir' ],
 parser.addArgument [ '-o', '--output_dir' ],
 	help: 'Output font file path (eg. "./dist")'
 	required: true
-
-parser.addArgument [ '-s', '--svgo_config' ],
-	help: 'SVGO config path (use default if not set)'
 	
 parser.addArgument [ '-p', '--prefix' ],
 	help: 'Prefix for CSS classes'

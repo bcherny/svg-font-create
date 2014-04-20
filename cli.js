@@ -25,10 +25,6 @@ parser.addArgument(['-o', '--output_dir'], {
   required: true
 });
 
-parser.addArgument(['-s', '--svgo_config'], {
-  help: 'SVGO config path (use default if not set)'
-});
-
 parser.addArgument(['-p', '--prefix'], {
   help: 'Prefix for CSS classes'
 });
