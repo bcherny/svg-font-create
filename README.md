@@ -27,7 +27,7 @@ SVG font creator
 svg-font-create can be summoned through the CLI, or with a node script:
 
 ```js
-require('./node_modules/svg-font-create/svg-font-create')({
+require('svg-font-create')({
 	prefix: 'mf',			// for CSS classes, eg. ".mf-favorite"
 	input_dir: './src',		// where your SVG source files are
 	output_dir: './dist'	// where you want the generated font to go
