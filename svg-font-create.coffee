@@ -7,6 +7,7 @@ glob = require 'glob'
 execSync = require 'exec-sync'
 SvgPath = require 'svgpath'
 util = require './util'
+config = require path.resolve './package.json'
 
 # config
 DEFAULT_CONFIG =
@@ -14,18 +15,16 @@ DEFAULT_CONFIG =
 	descent: 150
 	weight: 'Normal'
 
-config = require path.resolve './package.json'
-
-svgImageTemplate = util.loadTemplate './templates/image.svg'
-svgFontTemplate = util.loadTemplate './templates/font.svg'
+# templates
+svgTemplate = util.loadTemplate './templates/font.svg'
 cssTemplate = util.loadTemplate './templates/font.css'
 sassTemplate = util.loadTemplate './templates/font.scss'
 htmlTemplate = util.loadTemplate './templates/font.html'
 
+# regexes
 rgxUnicode = /([a-f][a-f\d]{3,4})/i
 rgxName = /-(.+).svg/
 rgxAcronym = /\b([\w\d])/ig
-rgxFiles = /[.]svg$/i
 
 parseSvgImage = (data, filename) ->
 
@@ -37,10 +36,6 @@ parseSvgImage = (data, filename) ->
 	
 	if not svg.hasAttribute 'width'
 		throw new Error "Missed width attribute in #{filename}"
-
-	# strip 'px' at the end, if exists
-	height = parseFloat svg.getAttribute 'height'
-	width = parseFloat svg.getAttribute 'width'
 
 	# get elements
 	paths = svg.getElementsByTagName 'path'
@@ -57,8 +52,8 @@ parseSvgImage = (data, filename) ->
 		paths = polygons
 
 	return {
-		height: height
-		width: width
+		height: parseFloat svg.getAttribute 'height'
+		width: parseFloat svg.getAttribute 'width'
 		d: d
 		transform: paths[0].getAttribute 'transform'
 	}
@@ -80,18 +75,17 @@ convert = (args) ->
 	console.log 'Scaling images'
 
 	# Recalculate coordinates from image to font
-	(glob.sync "#{args.input_dir}/*.svg").forEach (file) ->
+	glob
+	.sync "#{args.input_dir}/*.svg"
+	.forEach (file) ->
 		
 		glyph = parseSvgImage (fs.readFileSync file, 'utf8'), file
-		scale = fontHeight / glyph.height
-
-		glyph.d = do new SvgPath glyph.d
-		.scale scale
-		.scale 1, -1
-		.toString
-		
 		unicode = file.match rgxUnicode
 		name = file.match rgxName
+		d = do new SvgPath glyph.d
+		.scale fontHeight/glyph.height
+		.scale 1, -1
+		.toString
 
 		if not unicode[0]?
 			throw new Error "Expected #{file} to be in the format 'xxxx-icon-name.svg'"
@@ -100,7 +94,7 @@ convert = (args) ->
 			css: do ((path.basename name[0] or unicode[0], '.svg').replace /-/g, ' ').trim
 			unicode: "&#x#{unicode[0]};"
 			width: glyph.width
-			d: glyph.d
+			d: d
 
 	opts =
 		font: font
@@ -113,14 +107,12 @@ convert = (args) ->
 
 	svg = "#{args.output_dir }/#{config.name}.svg"
 	ttf = "#{args.output_dir}/#{config.name}.ttf"
-	woff = "#{args.output_dir}/#{config.name}.woff"
-	eot = "#{args.output_dir}/#{config.name}.eot"
 
 	_.forEach
-		'Generating SVG': -> fs.writeFileSync svg, (svgFontTemplate opts), 'utf8'
+		'Generating SVG': -> fs.writeFileSync svg, (svgTemplate opts), 'utf8'
 		'Generating TTF': -> execSync path.resolve __dirname, "./node_modules/.bin/svg2ttf #{svg} #{ttf}"
-		'Generating WOFF': -> execSync path.resolve __dirname, "./node_modules/.bin/ttf2woff #{ttf} #{woff}"
-		'Generating EOT': -> execSync path.resolve __dirname, "./node_modules/.bin/ttf2eot #{ttf} #{eot}"
+		'Generating WOFF': -> execSync path.resolve __dirname, "./node_modules/.bin/ttf2woff #{ttf} #{args.output_dir}/#{config.name}.woff"
+		'Generating EOT': -> execSync path.resolve __dirname, "./node_modules/.bin/ttf2eot #{ttf} #{args.output_dir}/#{config.name}.eot"
 		'Generating CSS': -> fs.writeFileSync './dist/font.css', (cssTemplate opts), 'utf8'
 		'Generating SASS': -> fs.writeFileSync './dist/font.scss', (sassTemplate opts), 'utf8'
 		'Generating HTML spec': -> fs.writeFileSync './dist/font.html', (htmlTemplate opts), 'utf8'
