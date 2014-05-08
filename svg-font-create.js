@@ -25,7 +25,7 @@ svgTemplate = util.loadTemplate('./templates/font.svg');
 
 cssTemplate = util.loadTemplate('./templates/font.css');
 
-sassTemplate = util.loadTemplate('./templates/font.scss');
+sassTemplate = util.loadTemplate('./templates/_font.scss');
 
 htmlTemplate = util.loadTemplate('./templates/font.html');
 
@@ -80,7 +80,7 @@ generate = function(data) {
       return fs.writeFileSync('./dist/font.css', cssTemplate(data), 'utf8');
     },
     'Generating SASS': function() {
-      return fs.writeFileSync('./dist/font.scss', sassTemplate(data), 'utf8');
+      return fs.writeFileSync('./dist/_font.scss', sassTemplate(data), 'utf8');
     },
     'Generating HTML spec': function() {
       return fs.writeFileSync('./dist/font.html', htmlTemplate(data), 'utf8');

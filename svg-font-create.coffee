@@ -13,7 +13,7 @@ config = require path.resolve './package.json'
 # templates
 svgTemplate = util.loadTemplate './templates/font.svg'
 cssTemplate = util.loadTemplate './templates/font.css'
-sassTemplate = util.loadTemplate './templates/font.scss'
+sassTemplate = util.loadTemplate './templates/_font.scss'
 htmlTemplate = util.loadTemplate './templates/font.html'
 
 # regexes
@@ -59,7 +59,7 @@ generate = (data) ->
 		'Generating WOFF': -> execSync path.resolve __dirname, "./node_modules/.bin/ttf2woff #{ttf} #{data.font.output_dir}/#{config.name}.woff"
 		'Generating EOT': -> execSync path.resolve __dirname, "./node_modules/.bin/ttf2eot #{ttf} #{data.font.output_dir}/#{config.name}.eot"
 		'Generating CSS': -> fs.writeFileSync './dist/font.css', (cssTemplate data), 'utf8'
-		'Generating SASS': -> fs.writeFileSync './dist/font.scss', (sassTemplate data), 'utf8'
+		'Generating SASS': -> fs.writeFileSync './dist/_font.scss', (sassTemplate data), 'utf8'
 		'Generating HTML spec': -> fs.writeFileSync './dist/font.html', (htmlTemplate data), 'utf8'
 		'Done!': ->
 	, (fn, message) ->
