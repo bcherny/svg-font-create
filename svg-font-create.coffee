@@ -20,6 +20,19 @@ htmlTemplate = util.loadTemplate './templates/font.html'
 rgxUnicode = /([a-f][a-f\d]{3,4})/i
 rgxName = /-(.+).svg/
 rgxAcronym = /\b([\w\d])/ig
+hiddenRules =
+	display: 'none'
+	visibility: 'hidden'
+	opacity: '0'
+
+isHidden = (element) ->
+	
+	element
+	.getAttribute 'style'
+	.split ';'
+	.filter (string) -> string
+	.map (string) -> string.split ':'
+	.some (rule) -> hiddenRules[rule[0]] is rule[1]
 
 parse = (data, filename) ->
 
@@ -35,18 +48,17 @@ parse = (data, filename) ->
 		throw new Error "Missing width attribute in #{filename}"
 
 	# get elements
-	paths = svg.getElementsByTagName 'path'
-	polygons = svg.getElementsByTagName 'polygon'
+	paths = _.reject (svg.getElementsByTagName 'path'), isHidden
+	polygons = _.reject (svg.getElementsByTagName 'polygon'), isHidden
 
 	# check for paths/polygons
 	if not paths.length and not polygons.length
 		throw new Error "No path or polygon data found in #{filename}"
 
-	return {
-		height: height
-		width: width
-		d: "#{util.compoundPathFromPaths paths} #{util.compoundPathFromPolygons polygons}"
-	}
+	# return
+	height: height
+	width: width
+	d: "#{util.compoundPathFromPaths paths} #{util.compoundPathFromPolygons polygons}"
 
 generate = (data) ->
 
