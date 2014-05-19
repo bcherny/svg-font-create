@@ -6,6 +6,7 @@ DOMParser = (require 'xmldom').DOMParser
 glob = require 'glob'
 execSync = require 'exec-sync'
 SvgPath = require 'svgpath'
+webshot = require 'webshot'
 util = require './util'
 defaults = require './defaults.json'
 config = require path.resolve './package.json'
@@ -15,6 +16,7 @@ svgTemplate = util.loadTemplate './templates/font.svg'
 cssTemplate = util.loadTemplate './templates/font.css'
 sassTemplate = util.loadTemplate './templates/_font.scss'
 htmlTemplate = util.loadTemplate './templates/font.html'
+phantomTemplate = util.loadTemplate './templates/phantom.css'
 
 # regexes
 rgxUnicode = /([a-f][a-f\d]{3,4})/i
@@ -50,7 +52,7 @@ parse = (data, filename) ->
 
 generate = (data) ->
 
-	svg = "#{data.font.output_dir }/#{config.name}.svg"
+	svg = "#{data.font.output_dir}/#{config.name}.svg"
 	ttf = "#{data.font.output_dir}/#{config.name}.ttf"
 
 	_.forEach
@@ -61,6 +63,16 @@ generate = (data) ->
 		'Generating CSS': -> fs.writeFileSync './dist/font.css', (cssTemplate data), 'utf8'
 		'Generating SASS': -> fs.writeFileSync './dist/_font.scss', (sassTemplate data), 'utf8'
 		'Generating HTML spec': -> fs.writeFileSync './dist/font.html', (htmlTemplate data), 'utf8'
+		'Generating PNG spec': ->
+
+			data.path = path.resolve "#{data.font.output_dir}/#{config.name}.woff"
+			data.b64 = new Buffer(fs.readFileSync "#{data.font.output_dir}/#{config.name}.woff").toString('base64')
+
+			webshot (phantomTemplate data), './dist/font.png',
+				renderDelay: 2000
+				siteType: 'html'
+			, (err) ->
+				throw new Error err
 		'Done!': ->
 	, (fn, message) ->
 		console.log message

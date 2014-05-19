@@ -1,0 +1,63 @@
+<!doctype html>
+<html>
+<head>
+	<meta charset="utf-8" />
+	<style>
+
+		@font-face {
+			font-family: '<%= fontFamily %>';
+			src: url(data:application/x-font-woff;charset=utf-8;base64,'<%= b64 %>') format('woff');
+			unicode-range: U+E601-U+E631;
+		}
+
+		[class^="<%= prefix %>-"], [class*=" <%= prefix %>-"] {
+			font-family: "<%= fontFamily %>";
+			speak: none;
+			font-style: normal;
+			font-weight: normal;
+			font-variant: normal;
+			text-transform: none;
+			line-height: 1;
+
+			/* Better Font Rendering =========== */
+			-webkit-font-smoothing: antialiased;
+			-moz-osx-font-smoothing: grayscale;
+		}
+
+		<% _.forEach(glyphs, function(glyph) { %>
+			.<%= prefix %>-<%= glyph.css.replace(/ /g, '-') %>:before {
+				content: "\<%= glyph.unicode.replace(/([^\w\d]+)/g, '').slice(1) %>";
+			}
+		<% }); %>
+
+		div {
+			background: #f9f9f9;
+			height: 100px;
+			float: left;
+			font-size: 36px;
+			margin: 0 1px 1px 0;
+			position: relative;
+			text-align: center;
+			width: 100px;
+		}
+
+		div span {
+			color: #666;
+			display: block;
+			font-size: 11px;
+			padding: 4px 8px;
+			position: absolute;
+				bottom: 0;
+				left: 0;
+				right: 0;
+		}
+	</style>
+</head>
+<body>
+
+	<% _.forEach(glyphs, function(glyph) { %>
+		<div class="tif-<%= glyph.css.replace(/ /g, '-') %>"><span><%= glyph.css %></span></div>
+	<% }); %>
+
+</body>
+</html>
